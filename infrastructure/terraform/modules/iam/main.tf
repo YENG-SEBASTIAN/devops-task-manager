@@ -1,0 +1,170 @@
+variable "name"             { type = string }
+variable "region"           { type = string }
+variable "backend_repo_arn" { type = string }
+variable "frontend_repo_arn" { type = string }
+
+# ── ECS Execution Role (pulls images, writes logs) ──────────
+
+data "aws_iam_policy_document" "ecs_assume" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["ecs-tasks.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "ecs_execution" {
+  name               = "${var.name}-ecs-execution"
+  assume_role_policy = data.aws_iam_policy_document.ecs_assume.json
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_execution" {
+  role       = aws_iam_role.ecs_execution.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+
+data "aws_iam_policy_document" "ecs_execution_extra" {
+  statement {
+    actions   = ["secretsmanager:GetSecretValue"]
+    resources = ["*"]
+  }
+
+  statement {
+    actions   = ["ssm:GetParameters"]
+    resources = ["*"]
+  }
+}
+
+resource "aws_iam_role_policy" "ecs_execution_extra" {
+  name   = "${var.name}-ecs-execution-extra"
+  role   = aws_iam_role.ecs_execution.id
+  policy = data.aws_iam_policy_document.ecs_execution_extra.json
+}
+
+# ── ECS Task Role (app permissions) ─────────────────────────
+
+resource "aws_iam_role" "ecs_task" {
+  name               = "${var.name}-ecs-task"
+  assume_role_policy = data.aws_iam_policy_document.ecs_assume.json
+}
+
+data "aws_iam_policy_document" "task_permissions" {
+  statement {
+    actions = [
+      "logs:CreateLogGroup",
+      "logs:CreateLogStream",
+      "logs:PutLogEvents",
+    ]
+    resources = ["*"]
+  }
+
+  statement {
+    actions   = ["ecr:GetAuthorizationToken"]
+    resources = ["*"]
+  }
+
+  statement {
+    actions = [
+      "ecr:BatchCheckLayerAvailability",
+      "ecr:GetDownloadUrlForLayer",
+      "ecr:BatchGetImage",
+    ]
+    resources = [
+      var.backend_repo_arn,
+      var.frontend_repo_arn,
+    ]
+  }
+}
+
+resource "aws_iam_role_policy" "task_permissions" {
+  name   = "${var.name}-task-permissions"
+  role   = aws_iam_role.ecs_task.id
+  policy = data.aws_iam_policy_document.task_permissions.json
+}
+
+# ── GitHub Actions OIDC Role ────────────────────────────────
+
+data "aws_iam_policy_document" "github_assume" {
+  statement {
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+    principals {
+      type        = "Federated"
+      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/token.actions.githubusercontent.com"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+    condition {
+      test     = "StringLike"
+      variable = "token.actions.githubusercontent.com:sub"
+      values   = ["repo:YENG-SEBASTIAN/devops-task-manager:*"]
+    }
+  }
+}
+
+data "aws_caller_identity" "current" {}
+
+resource "aws_iam_role" "github_actions" {
+  name               = "${var.name}-github-actions"
+  assume_role_policy = data.aws_iam_policy_document.github_assume.json
+}
+
+data "aws_iam_policy_document" "github_permissions" {
+  statement {
+    actions = [
+      "ecr:GetAuthorizationToken",
+    ]
+    resources = ["*"]
+  }
+
+  statement {
+    actions = [
+      "ecr:BatchCheckLayerAvailability",
+      "ecr:GetDownloadUrlForLayer",
+      "ecr:BatchGetImage",
+      "ecr:PutImage",
+      "ecr:InitiateLayerUpload",
+      "ecr:UploadLayerPart",
+      "ecr:CompleteLayerUpload",
+      "ecr:BatchDeleteImage",
+    ]
+    resources = [
+      var.backend_repo_arn,
+      var.frontend_repo_arn,
+    ]
+  }
+
+  statement {
+    actions = [
+      "ecs:UpdateService",
+      "ecs:DescribeServices",
+      "ecs:DescribeTaskDefinition",
+      "ecs:RegisterTaskDefinition",
+    ]
+    resources = ["*"]
+  }
+
+  statement {
+    actions   = ["iam:PassRole"]
+    resources = ["*"]
+    condition {
+      test     = "StringEquals"
+      variable = "iam:PassedToService"
+      values   = ["ecs-tasks.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role_policy" "github_permissions" {
+  name   = "${var.name}-github-permissions"
+  role   = aws_iam_role.github_actions.id
+  policy = data.aws_iam_policy_document.github_permissions.json
+}
+
+output "ecs_execution_role_arn" { value = aws_iam_role.ecs_execution.arn }
+output "ecs_task_role_arn"      { value = aws_iam_role.ecs_task.arn }
+output "github_actions_role_arn" { value = aws_iam_role.github_actions.arn }

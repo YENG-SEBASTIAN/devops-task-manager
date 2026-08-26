@@ -15,3 +15,74 @@ variable "environment" {
   type        = string
   default     = "dev"
 }
+
+# ── Networking ──────────────────────────────────────────────
+
+variable "vpc_cidr" {
+  description = "CIDR block for the VPC."
+  type        = string
+  default     = "10.0.0.0/16"
+}
+
+variable "az_count" {
+  description = "Number of availability zones to use."
+  type        = number
+  default     = 2
+}
+
+# ── Database ────────────────────────────────────────────────
+
+variable "db_name" {
+  description = "PostgreSQL database name."
+  type        = string
+  default     = "task_manager"
+}
+
+variable "db_username" {
+  description = "PostgreSQL master username."
+  type        = string
+  default     = "task_manager"
+  sensitive   = true
+}
+
+variable "db_password" {
+  description = "PostgreSQL master password."
+  type        = string
+  sensitive   = true
+}
+
+variable "db_instance_class" {
+  description = "RDS instance class."
+  type        = string
+  default     = "db.t3.micro"
+}
+
+# ── Redis ───────────────────────────────────────────────────
+
+variable "redis_node_type" {
+  description = "ElastiCache Redis node type."
+  type        = string
+  default     = "cache.t3.micro"
+}
+
+# ── Docker Images ───────────────────────────────────────────
+
+variable "backend_image" {
+  description = "Backend Docker image URI (set by CI/CD)."
+  type        = string
+  default     = ""
+}
+
+variable "frontend_image" {
+  description = "Frontend Docker image URI (set by CI/CD)."
+  type        = string
+  default     = ""
+}
+
+# ── Secrets ─────────────────────────────────────────────────
+
+variable "django_secret_key" {
+  description = "Django secret key."
+  type        = string
+  sensitive   = true
+}
