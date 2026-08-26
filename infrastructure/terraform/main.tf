@@ -213,5 +213,6 @@ module "lambda" {
 module "cloudwatch" {
   source = "./modules/cloudwatch"
 
-  name = local.name
+  name   = local.name
+  region = var.aws_region
 }

@@ -116,7 +116,7 @@ resource "aws_cloudwatch_dashboard" "this" {
         height = 6
         properties = {
           title  = "Backend CPU Utilization"
-          region = "us-east-1"
+          region = var.region
           metrics = [
             ["AWS/ECS", "CPUUtilization", "ClusterName", var.name, "ServiceName", "${var.name}-backend"]
           ]
@@ -132,7 +132,7 @@ resource "aws_cloudwatch_dashboard" "this" {
         height = 6
         properties = {
           title  = "Backend Memory Utilization"
-          region = "us-east-1"
+          region = var.region
           metrics = [
             ["AWS/ECS", "MemoryUtilization", "ClusterName", var.name, "ServiceName", "${var.name}-backend"]
           ]
@@ -148,7 +148,7 @@ resource "aws_cloudwatch_dashboard" "this" {
         height = 6
         properties = {
           title  = "Frontend CPU Utilization"
-          region = "us-east-1"
+          region = var.region
           metrics = [
             ["AWS/ECS", "CPUUtilization", "ClusterName", var.name, "ServiceName", "${var.name}-frontend"]
           ]

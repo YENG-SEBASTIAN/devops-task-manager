@@ -7,7 +7,7 @@ on:
     branches: [master]
 
 env:
-  AWS_REGION: us-east-1
+  AWS_REGION: eu-west-2
   ECR_BACKEND_REPO: task-manager-backend
   ECS_CLUSTER: task-manager-dev
   ECS_BACKEND_SERVICE: task-manager-dev-backend

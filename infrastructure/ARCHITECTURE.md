@@ -401,13 +401,13 @@ Each module contains:
 aws configure
 
 # 2. Create Terraform state backend
-aws s3 mb s3://task-manager-terraform-state --region us-east-1
+aws s3 mb s3://task-manager-terraform-state --region eu-west-2
 aws dynamodb create-table \
   --table-name task-manager-terraform-locks \
   --attribute-definitions AttributeName=LockID,AttributeType=S \
   --key-schema AttributeName=LockID,KeyType=HASH \
   --billing-mode PAY_PER_REQUEST \
-  --region us-east-1
+  --region eu-west-2
 
 # 3. Create tfvars file
 cp environments/dev.tfvars.example environments/dev.tfvars
