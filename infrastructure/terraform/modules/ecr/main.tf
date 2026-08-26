@@ -1,5 +1,3 @@
-variable "name" { type = string }
-
 resource "aws_ecr_repository" "backend" {
   name                 = "${var.name}-backend"
   image_tag_mutability = "MUTABLE"
@@ -53,8 +51,3 @@ resource "aws_ecr_lifecycle_policy" "frontend" {
     }]
   })
 }
-
-output "backend_repository_url"  { value = aws_ecr_repository.backend.repository_url }
-output "frontend_repository_url" { value = aws_ecr_repository.frontend.repository_url }
-output "backend_repository_arn"  { value = aws_ecr_repository.backend.arn }
-output "frontend_repository_arn" { value = aws_ecr_repository.frontend.arn }

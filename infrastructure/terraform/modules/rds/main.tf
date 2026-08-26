@@ -1,12 +1,3 @@
-variable "name"               { type = string }
-variable "vpc_id"             { type = string }
-variable "subnet_ids"         { type = list(string) }
-variable "security_group_ids" { type = list(string) }
-variable "db_name"            { type = string }
-variable "db_username"        { type = string }
-variable "db_password"        { type = string }
-variable "instance_class"     { type = string }
-
 resource "aws_db_subnet_group" "this" {
   name       = "${var.name}-db"
   subnet_ids = var.subnet_ids
@@ -41,6 +32,3 @@ resource "aws_rds_cluster_instance" "this" {
 
   tags = { Name = "${var.name}-db-instance" }
 }
-
-output "endpoint" { value = aws_rds_cluster.this.endpoint }
-output "port"     { value = aws_rds_cluster.this.port }

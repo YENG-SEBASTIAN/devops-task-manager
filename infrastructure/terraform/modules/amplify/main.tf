@@ -1,9 +1,3 @@
-variable "name"             { type = string }
-variable "github_repo"      { type = string }
-variable "github_token"     { type = string }
-variable "api_url"          { type = string }
-variable "backend_repo_arn" { type = string }
-
 # ── Amplify IAM Role ────────────────────────────────────────
 
 data "aws_iam_policy_document" "amplify_assume" {
@@ -63,19 +57,19 @@ resource "aws_amplify_app" "this" {
               - .next/cache/**/*
   EOT
 
-  enable_branch_auto_build = true
+  enable_branch_auto_build   = true
   enable_branch_auto_deletion = true
 
   custom_rule {
-    source    = "</^((?!\\/api\\/).)*$/>"
-    status    = "200"
-    target    = "/index.html"
+    source = "</^((?!\\/api\\/).)*$/>"
+    status = "200"
+    target = "/index.html"
   }
 
   custom_rule {
-    source    = "/api/<*>"
-    status    = "404"
-    target    = "/index.html"
+    source = "/api/<*>"
+    status = "404"
+    target = "/index.html"
   }
 
   tags = { Name = var.name }
@@ -128,12 +122,3 @@ resource "aws_amplify_domain_association" "this" {
     prefix      = "pr-"
   }
 }
-
-variable "domain_name" {
-  type    = string
-  default = ""
-}
-
-output "app_id"     { value = aws_amplify_app.this.id }
-output "default_domain" { value = aws_amplify_app.this.default_domain }
-output "amplify_url" { value = "https://${aws_amplify_branch.main.branch_name}.${aws_amplify_app.this.default_domain}" }

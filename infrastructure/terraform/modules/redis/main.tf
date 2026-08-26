@@ -1,8 +1,3 @@
-variable "name"               { type = string }
-variable "subnet_ids"         { type = list(string) }
-variable "security_group_ids" { type = list(string) }
-variable "node_type"          { type = string }
-
 resource "aws_elasticache_subnet_group" "this" {
   name       = "${var.name}-redis"
   subnet_ids = var.subnet_ids
@@ -30,6 +25,3 @@ resource "aws_elasticache_replication_group" "this" {
 
   tags = { Name = "${var.name}-redis" }
 }
-
-output "endpoint" { value = aws_elasticache_replication_group.this.primary_endpoint_address }
-output "port"     { value = aws_elasticache_replication_group.this.port }

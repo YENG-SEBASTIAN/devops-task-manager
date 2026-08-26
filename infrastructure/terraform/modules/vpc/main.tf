@@ -1,8 +1,3 @@
-variable "name"       { type = string }
-variable "cidr"       { type = string }
-variable "azs"        { type = list(string) }
-variable "project_name" { type = string }
-
 resource "aws_vpc" "this" {
   cidr_block           = var.cidr
   enable_dns_hostnames = true
@@ -93,9 +88,3 @@ resource "aws_route_table_association" "private" {
   subnet_id      = each.value.id
   route_table_id = aws_route_table.private[each.key].id
 }
-
-# ── Outputs ─────────────────────────────────────────────────
-
-output "vpc_id"            { value = aws_vpc.this.id }
-output "public_subnets"    { value = [for s in aws_subnet.public : s.id] }
-output "private_subnets"   { value = [for s in aws_subnet.private : s.id] }

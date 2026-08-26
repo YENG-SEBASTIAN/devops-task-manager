@@ -1,11 +1,3 @@
-variable "name"              { type = string }
-variable "region"            { type = string }
-variable "backend_repo_arn"  { type = string }
-variable "secret_arns"       { type = list(string) }
-variable "amplify_app_arn"   { type = string }
-variable "lambda_role_arn"   { type = string }
-variable "sqs_queue_arn"     { type = string }
-
 # ── ECS Execution Role (pulls images, reads secrets) ────────
 
 data "aws_iam_policy_document" "ecs_assume" {
@@ -95,6 +87,8 @@ resource "aws_iam_role_policy" "task_permissions" {
 
 # ── GitHub Actions OIDC Role ────────────────────────────────
 
+data "aws_caller_identity" "current" {}
+
 data "aws_iam_policy_document" "github_assume" {
   statement {
     actions = ["sts:AssumeRoleWithWebIdentity"]
@@ -114,8 +108,6 @@ data "aws_iam_policy_document" "github_assume" {
     }
   }
 }
-
-data "aws_caller_identity" "current" {}
 
 resource "aws_iam_role" "github_actions" {
   name               = "${var.name}-github-actions"
@@ -194,7 +186,3 @@ resource "aws_iam_role_policy" "github_permissions" {
   role   = aws_iam_role.github_actions.id
   policy = data.aws_iam_policy_document.github_permissions.json
 }
-
-output "ecs_execution_role_arn"  { value = aws_iam_role.ecs_execution.arn }
-output "ecs_task_role_arn"       { value = aws_iam_role.ecs_task.arn }
-output "github_actions_role_arn" { value = aws_iam_role.github_actions.arn }

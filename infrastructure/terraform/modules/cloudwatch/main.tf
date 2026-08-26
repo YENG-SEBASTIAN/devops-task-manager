@@ -1,5 +1,3 @@
-variable "name" { type = string }
-
 resource "aws_cloudwatch_log_group" "this" {
   name              = "/ecs/${var.name}"
   retention_in_days = 30
@@ -161,6 +159,3 @@ resource "aws_cloudwatch_dashboard" "this" {
     ]
   })
 }
-
-output "log_group_name" { value = aws_cloudwatch_log_group.this.name }
-output "dashboard_name" { value = aws_cloudwatch_dashboard.this.dashboard_name }

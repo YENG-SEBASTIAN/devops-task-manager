@@ -1,18 +1,3 @@
-variable "name"                 { type = string }
-variable "region"               { type = string }
-variable "private_subnets"      { type = list(string) }
-variable "backend_image"        { type = string }
-variable "backend_sg_id"        { type = string }
-variable "backend_target_group" { type = string }
-variable "execution_role_arn"   { type = string }
-variable "task_role_arn"        { type = string }
-variable "db_secret_arn"        { type = string }
-variable "django_secret_arn"    { type = string }
-variable "redis_secret_arn"     { type = string }
-variable "log_group_name"       { type = string }
-
-# ── ECS Cluster ─────────────────────────────────────────────
-
 resource "aws_ecs_cluster" "this" {
   name = var.name
 
@@ -131,7 +116,3 @@ resource "aws_appautoscaling_policy" "backend_cpu" {
     target_value = 70
   }
 }
-
-output "cluster_name"     { value = aws_ecs_cluster.this.name }
-output "cluster_arn"      { value = aws_ecs_cluster.this.arn }
-output "backend_service"  { value = aws_ecs_service.backend.name }
