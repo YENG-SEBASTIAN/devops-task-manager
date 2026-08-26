@@ -1,12 +1,13 @@
 services:
   db:
-    image: postgres:16-alpine
+    image: postgis/postgis:16-3.5
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-task_manager}
       POSTGRES_USER: ${POSTGRES_USER:-task_manager}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-task_manager}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./backend/postgres/init/01-enable-postgis.sql:/docker-entrypoint-initdb.d/01-enable-postgis.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -31,7 +32,7 @@ services:
       python manage.py runserver 0.0.0.0:8000"
     environment:
       DJANGO_DEBUG: "True"
-      SECRET_KEY: ${DJANGO_SECRET_KEY:-unsafe-development-key}
+      SECRET_KEY: ${DJANGO_SECRET_KEY}
       ALLOWED_HOSTS: localhost,127.0.0.1,backend
       CORS_ALLOWED_ORIGINS: http://localhost:3000
       DATABASE_URL: postgresql://${POSTGRES_USER:-task_manager}:${POSTGRES_PASSWORD:-task_manager}@db:5432/${POSTGRES_DB:-task_manager}

@@ -20,6 +20,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "rest_framework",
     "drf_yasg",
+    "django.contrib.gis",
     "users",
     "tasks",
 ]
@@ -50,16 +51,13 @@ WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
 def database_config():
-    """Use SQLite locally, or a PostgreSQL URL supplied through DATABASE_URL."""
-    database_url = config("DATABASE_URL", default="sqlite")
-    if database_url == "sqlite":
-        return {"ENGINE": "django.db.backends.sqlite3", "NAME": BASE_DIR / "db.sqlite3"}
-
+    """Configure Django to connect to the PostGIS database service."""
+    database_url = config("DATABASE_URL")
     parsed = urlparse(database_url)
     if parsed.scheme not in ("postgres", "postgresql"):
-        raise ValueError("DATABASE_URL must be 'sqlite' or a PostgreSQL URL")
+        raise ValueError("DATABASE_URL must be a PostgreSQL connection URL")
     return {
-        "ENGINE": "django.db.backends.postgresql",
+        "ENGINE": "django.contrib.gis.db.backends.postgis",
         "NAME": parsed.path.lstrip("/"),
         "USER": parsed.username or "",
         "PASSWORD": parsed.password or "",
