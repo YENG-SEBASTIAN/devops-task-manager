@@ -61,3 +61,18 @@ output "github_actions_role_arn" {
   description = "IAM role ARN for GitHub Actions."
   value       = module.iam.github_actions_role_arn
 }
+
+output "lambda_functions" {
+  description = "Lambda function names."
+  value = {
+    health_check = module.lambda.health_check_function_name
+    notification = module.lambda.notification_function_arn
+    webhook      = module.lambda.webhook_function_arn
+    cleanup      = module.lambda.cleanup_function_arn
+  }
+}
+
+output "sqs_queue_url" {
+  description = "SQS queue URL for notifications."
+  value       = module.lambda.sqs_queue_url
+}

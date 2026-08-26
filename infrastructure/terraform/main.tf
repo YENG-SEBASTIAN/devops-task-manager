@@ -158,6 +158,8 @@ module "iam" {
     module.secrets.redis_secret_arn,
   ]
   amplify_app_arn = module.amplify.app_arn
+  lambda_role_arn = module.lambda.lambda_role_arn
+  sqs_queue_arn   = module.lambda.sqs_queue_arn
 }
 
 # ── ECS (backend only) ──────────────────────────────────────
@@ -189,6 +191,21 @@ module "amplify" {
   github_token     = var.github_token
   api_url          = local.api_url
   backend_repo_arn = module.ecr.backend_repository_arn
+}
+
+# ── Lambda (health checks, webhooks, notifications) ─────────
+
+module "lambda" {
+  source = "./modules/lambda"
+
+  name           = local.name
+  region         = var.aws_region
+  secret_arns = [
+    module.secrets.db_secret_arn,
+    module.secrets.django_secret_arn,
+    module.secrets.redis_secret_arn,
+  ]
+  log_group_name = module.cloudwatch.log_group_name
 }
 
 # ── CloudWatch ──────────────────────────────────────────────

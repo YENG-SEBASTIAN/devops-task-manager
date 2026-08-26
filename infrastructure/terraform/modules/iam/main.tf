@@ -3,6 +3,8 @@ variable "region"            { type = string }
 variable "backend_repo_arn"  { type = string }
 variable "secret_arns"       { type = list(string) }
 variable "amplify_app_arn"   { type = string }
+variable "lambda_role_arn"   { type = string }
+variable "sqs_queue_arn"     { type = string }
 
 # ── ECS Execution Role (pulls images, reads secrets) ────────
 
@@ -152,18 +154,18 @@ data "aws_iam_policy_document" "github_permissions" {
     resources = ["*"]
   }
 
-  # IAM PassRole for ECS
+  # IAM PassRole for ECS and Lambda
   statement {
     actions   = ["iam:PassRole"]
     resources = ["*"]
     condition {
       test     = "StringEquals"
       variable = "iam:PassedToService"
-      values   = ["ecs-tasks.amazonaws.com"]
+      values   = ["ecs-tasks.amazonaws.com", "lambda.amazonaws.com"]
     }
   }
 
-  # Secrets Manager (read-only, for deploy verification)
+  # Secrets Manager (read-only)
   statement {
     actions   = ["secretsmanager:GetSecretValue"]
     resources = var.secret_arns
@@ -171,10 +173,19 @@ data "aws_iam_policy_document" "github_permissions" {
 
   # Amplify permissions
   statement {
-    actions = [
-      "amplify:*",
-    ]
+    actions   = ["amplify:*"]
     resources = [var.amplify_app_arn]
+  }
+
+  # Lambda permissions (for CI/CD updates)
+  statement {
+    actions = [
+      "lambda:UpdateFunctionCode",
+      "lambda:UpdateFunctionConfiguration",
+      "lambda:GetFunction",
+      "lambda:PublishVersion",
+    ]
+    resources = ["arn:aws:lambda:${var.region}:*:function:${var.name}-*"]
   }
 }
 
