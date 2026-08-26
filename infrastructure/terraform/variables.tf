@@ -73,16 +73,31 @@ variable "backend_image" {
   default     = ""
 }
 
-variable "frontend_image" {
-  description = "Frontend Docker image URI (set by CI/CD)."
-  type        = string
-  default     = ""
-}
-
 # ── Secrets ─────────────────────────────────────────────────
 
 variable "django_secret_key" {
   description = "Django secret key."
   type        = string
   sensitive   = true
+}
+
+# ── GitHub / Amplify ────────────────────────────────────────
+
+variable "github_repo" {
+  description = "GitHub repository URL (HTTPS)."
+  type        = string
+}
+
+variable "github_token" {
+  description = "GitHub personal access token for Amplify."
+  type        = string
+  sensitive   = true
+}
+
+# ── SSL ─────────────────────────────────────────────────────
+
+variable "certificate_arn" {
+  description = "ACM certificate ARN for HTTPS on the ALB."
+  type        = string
+  default     = ""
 }

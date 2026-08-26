@@ -1,9 +1,10 @@
-variable "name"             { type = string }
-variable "region"           { type = string }
-variable "backend_repo_arn" { type = string }
-variable "frontend_repo_arn" { type = string }
+variable "name"              { type = string }
+variable "region"            { type = string }
+variable "backend_repo_arn"  { type = string }
+variable "secret_arns"       { type = list(string) }
+variable "amplify_app_arn"   { type = string }
 
-# ── ECS Execution Role (pulls images, writes logs) ──────────
+# ── ECS Execution Role (pulls images, reads secrets) ────────
 
 data "aws_iam_policy_document" "ecs_assume" {
   statement {
@@ -28,11 +29,29 @@ resource "aws_iam_role_policy_attachment" "ecs_execution" {
 data "aws_iam_policy_document" "ecs_execution_extra" {
   statement {
     actions   = ["secretsmanager:GetSecretValue"]
+    resources = var.secret_arns
+  }
+
+  statement {
+    actions = [
+      "logs:CreateLogGroup",
+      "logs:CreateLogStream",
+      "logs:PutLogEvents",
+    ]
     resources = ["*"]
   }
 
   statement {
-    actions   = ["ssm:GetParameters"]
+    actions = [
+      "ecr:BatchCheckLayerAvailability",
+      "ecr:GetDownloadUrlForLayer",
+      "ecr:BatchGetImage",
+    ]
+    resources = [var.backend_repo_arn]
+  }
+
+  statement {
+    actions   = ["ecr:GetAuthorizationToken"]
     resources = ["*"]
   }
 }
@@ -52,29 +71,17 @@ resource "aws_iam_role" "ecs_task" {
 
 data "aws_iam_policy_document" "task_permissions" {
   statement {
+    actions   = ["secretsmanager:GetSecretValue"]
+    resources = var.secret_arns
+  }
+
+  statement {
     actions = [
       "logs:CreateLogGroup",
       "logs:CreateLogStream",
       "logs:PutLogEvents",
     ]
     resources = ["*"]
-  }
-
-  statement {
-    actions   = ["ecr:GetAuthorizationToken"]
-    resources = ["*"]
-  }
-
-  statement {
-    actions = [
-      "ecr:BatchCheckLayerAvailability",
-      "ecr:GetDownloadUrlForLayer",
-      "ecr:BatchGetImage",
-    ]
-    resources = [
-      var.backend_repo_arn,
-      var.frontend_repo_arn,
-    ]
   }
 }
 
@@ -114,10 +121,9 @@ resource "aws_iam_role" "github_actions" {
 }
 
 data "aws_iam_policy_document" "github_permissions" {
+  # ECR permissions
   statement {
-    actions = [
-      "ecr:GetAuthorizationToken",
-    ]
+    actions   = ["ecr:GetAuthorizationToken"]
     resources = ["*"]
   }
 
@@ -132,12 +138,10 @@ data "aws_iam_policy_document" "github_permissions" {
       "ecr:CompleteLayerUpload",
       "ecr:BatchDeleteImage",
     ]
-    resources = [
-      var.backend_repo_arn,
-      var.frontend_repo_arn,
-    ]
+    resources = [var.backend_repo_arn]
   }
 
+  # ECS permissions
   statement {
     actions = [
       "ecs:UpdateService",
@@ -148,6 +152,7 @@ data "aws_iam_policy_document" "github_permissions" {
     resources = ["*"]
   }
 
+  # IAM PassRole for ECS
   statement {
     actions   = ["iam:PassRole"]
     resources = ["*"]
@@ -157,6 +162,20 @@ data "aws_iam_policy_document" "github_permissions" {
       values   = ["ecs-tasks.amazonaws.com"]
     }
   }
+
+  # Secrets Manager (read-only, for deploy verification)
+  statement {
+    actions   = ["secretsmanager:GetSecretValue"]
+    resources = var.secret_arns
+  }
+
+  # Amplify permissions
+  statement {
+    actions = [
+      "amplify:*",
+    ]
+    resources = [var.amplify_app_arn]
+  }
 }
 
 resource "aws_iam_role_policy" "github_permissions" {
@@ -165,6 +184,6 @@ resource "aws_iam_role_policy" "github_permissions" {
   policy = data.aws_iam_policy_document.github_permissions.json
 }
 
-output "ecs_execution_role_arn" { value = aws_iam_role.ecs_execution.arn }
-output "ecs_task_role_arn"      { value = aws_iam_role.ecs_task.arn }
+output "ecs_execution_role_arn"  { value = aws_iam_role.ecs_execution.arn }
+output "ecs_task_role_arn"       { value = aws_iam_role.ecs_task.arn }
 output "github_actions_role_arn" { value = aws_iam_role.github_actions.arn }

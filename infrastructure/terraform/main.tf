@@ -2,24 +2,22 @@ locals {
   name = "${var.project_name}-${var.environment}"
   azs  = slice(data.aws_availability_zones.available.names, 0, var.az_count)
 
-  backend_image  = var.backend_image != "" ? var.backend_image : "${aws_ecr_repository.backend.repository_url}:latest"
-  frontend_image = var.frontend_image != "" ? var.frontend_image : "${aws_ecr_repository.frontend.repository_url}:latest"
+  backend_image = var.backend_image != "" ? var.backend_image : "${module.ecr.backend_repository_url}:latest"
+  api_url       = "http://${module.alb.dns_name}/api"
 }
 
 data "aws_availability_zones" "available" {
   state = "available"
 }
 
-data "aws_caller_identity" "current" {}
-
 # ── VPC ─────────────────────────────────────────────────────
 
 module "vpc" {
   source = "./modules/vpc"
 
-  name       = local.name
-  cidr       = var.vpc_cidr
-  azs        = local.azs
+  name         = local.name
+  cidr         = var.vpc_cidr
+  azs          = local.azs
   project_name = var.project_name
 }
 
@@ -29,17 +27,6 @@ module "ecr" {
   source = "./modules/ecr"
 
   name = local.name
-}
-
-# ── IAM ─────────────────────────────────────────────────────
-
-module "iam" {
-  source = "./modules/iam"
-
-  name               = local.name
-  region             = var.aws_region
-  backend_repo_arn   = module.ecr.backend_repository_arn
-  frontend_repo_arn  = module.ecr.frontend_repository_arn
 }
 
 # ── ALB ─────────────────────────────────────────────────────
@@ -78,37 +65,7 @@ resource "aws_security_group" "backend" {
 
   tags = { Name = "${local.name}-backend" }
 
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-resource "aws_security_group" "frontend" {
-  name_prefix = "${local.name}-frontend-"
-  vpc_id      = module.vpc.vpc_id
-  description = "Frontend ECS tasks security group"
-
-  ingress {
-    from_port       = 3000
-    to_port         = 3000
-    protocol        = "tcp"
-    security_groups = [module.alb.security_group_id]
-    description     = "Allow traffic from ALB"
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "Allow all outbound"
-  }
-
-  tags = { Name = "${local.name}-frontend" }
-
-  lifecycle {
-    create_before_destroy = true
-  }
+  lifecycle { create_before_destroy = true }
 }
 
 resource "aws_security_group" "rds" {
@@ -126,9 +83,7 @@ resource "aws_security_group" "rds" {
 
   tags = { Name = "${local.name}-rds" }
 
-  lifecycle {
-    create_before_destroy = true
-  }
+  lifecycle { create_before_destroy = true }
 }
 
 resource "aws_security_group" "redis" {
@@ -146,9 +101,7 @@ resource "aws_security_group" "redis" {
 
   tags = { Name = "${local.name}-redis" }
 
-  lifecycle {
-    create_before_destroy = true
-  }
+  lifecycle { create_before_destroy = true }
 }
 
 # ── RDS ─────────────────────────────────────────────────────
@@ -177,30 +130,65 @@ module "redis" {
   node_type          = var.redis_node_type
 }
 
-# ── ECS ─────────────────────────────────────────────────────
+# ── Secrets Manager ─────────────────────────────────────────
+
+module "secrets" {
+  source = "./modules/secrets"
+
+  name              = local.name
+  db_name           = var.db_name
+  db_username       = var.db_username
+  db_password       = var.db_password
+  db_host           = module.rds.endpoint
+  redis_host        = module.redis.endpoint
+  django_secret_key = var.django_secret_key
+}
+
+# ── IAM ─────────────────────────────────────────────────────
+
+module "iam" {
+  source = "./modules/iam"
+
+  name             = local.name
+  region           = var.aws_region
+  backend_repo_arn = module.ecr.backend_repository_arn
+  secret_arns = [
+    module.secrets.db_secret_arn,
+    module.secrets.django_secret_arn,
+    module.secrets.redis_secret_arn,
+  ]
+  amplify_app_arn = module.amplify.app_arn
+}
+
+# ── ECS (backend only) ──────────────────────────────────────
 
 module "ecs" {
   source = "./modules/ecs"
 
   name                = local.name
   region              = var.aws_region
-  vpc_id              = module.vpc.vpc_id
   private_subnets     = module.vpc.private_subnets
   backend_image       = local.backend_image
-  frontend_image      = local.frontend_image
   backend_sg_id       = aws_security_group.backend.id
-  frontend_sg_id      = aws_security_group.frontend.id
   backend_target_group = module.alb.backend_target_group_arn
-  frontend_target_group = module.alb.frontend_target_group_arn
   execution_role_arn  = module.iam.ecs_execution_role_arn
   task_role_arn       = module.iam.ecs_task_role_arn
-  db_host             = module.rds.endpoint
-  db_name             = var.db_name
-  db_username         = var.db_username
-  db_password         = var.db_password
-  redis_host          = module.redis.endpoint
-  django_secret_key   = var.django_secret_key
+  db_secret_arn       = module.secrets.db_secret_arn
+  django_secret_arn   = module.secrets.django_secret_arn
+  redis_secret_arn    = module.secrets.redis_secret_arn
   log_group_name      = module.cloudwatch.log_group_name
+}
+
+# ── Amplify (frontend) ──────────────────────────────────────
+
+module "amplify" {
+  source = "./modules/amplify"
+
+  name             = local.name
+  github_repo      = var.github_repo
+  github_token     = var.github_token
+  api_url          = local.api_url
+  backend_repo_arn = module.ecr.backend_repository_arn
 }
 
 # ── CloudWatch ──────────────────────────────────────────────

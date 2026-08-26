@@ -13,14 +13,29 @@ output "backend_repository_url" {
   value       = module.ecr.backend_repository_url
 }
 
-output "frontend_repository_url" {
-  description = "ECR frontend repository URL."
-  value       = module.ecr.frontend_repository_url
+output "alb_dns_name" {
+  description = "Application Load Balancer DNS name (backend API)."
+  value       = module.alb.dns_name
 }
 
-output "alb_dns_name" {
-  description = "Application Load Balancer DNS name."
-  value       = module.alb.dns_name
+output "api_url" {
+  description = "Backend API URL."
+  value       = local.api_url
+}
+
+output "amplify_app_id" {
+  description = "Amplify app ID."
+  value       = module.amplify.app_id
+}
+
+output "amplify_url" {
+  description = "Amplify frontend URL."
+  value       = module.amplify.amplify_url
+}
+
+output "amplify_default_domain" {
+  description = "Amplify default domain."
+  value       = module.amplify.default_domain
 }
 
 output "rds_endpoint" {
@@ -33,12 +48,16 @@ output "redis_endpoint" {
   value       = module.redis.endpoint
 }
 
-output "ecs_task_role_arn" {
-  description = "ECS task role ARN (needed for GitHub Actions)."
-  value       = module.iam.ecs_task_role_arn
+output "secrets_manager_arns" {
+  description = "Secrets Manager secret ARNs."
+  value = {
+    db_password     = module.secrets.db_secret_arn
+    django_secret   = module.secrets.django_secret_arn
+    redis           = module.secrets.redis_secret_arn
+  }
 }
 
-output "ecs_execution_role_arn" {
-  description = "ECS execution role ARN (needed for GitHub Actions)."
-  value       = module.iam.ecs_execution_role_arn
+output "github_actions_role_arn" {
+  description = "IAM role ARN for GitHub Actions."
+  value       = module.iam.github_actions_role_arn
 }

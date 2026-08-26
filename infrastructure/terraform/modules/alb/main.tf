@@ -51,7 +51,7 @@ resource "aws_lb" "this" {
   tags = { Name = var.name }
 }
 
-# ── Target Groups ───────────────────────────────────────────
+# ── Target Group (backend only) ─────────────────────────────
 
 resource "aws_lb_target_group" "backend" {
   name        = "${var.name}-backend"
@@ -72,42 +72,7 @@ resource "aws_lb_target_group" "backend" {
   lifecycle { create_before_destroy = true }
 }
 
-resource "aws_lb_target_group" "frontend" {
-  name        = "${var.name}-frontend"
-  port        = 3000
-  protocol    = "HTTP"
-  vpc_id      = var.vpc_id
-  target_type = "ip"
-
-  health_check {
-    path                = "/"
-    healthy_threshold   = 3
-    unhealthy_threshold = 3
-    timeout             = 5
-    interval            = 30
-    matcher             = "200"
-  }
-
-  lifecycle { create_before_destroy = true }
-}
-
 # ── Listeners ───────────────────────────────────────────────
-
-resource "aws_lb_listener" "http" {
-  load_balancer_arn = aws_lb.this.arn
-  port              = 80
-  protocol          = "HTTP"
-
-  default_action {
-    type = "redirect"
-
-    redirect {
-      port        = "443"
-      protocol    = "HTTPS"
-      status_code = "HTTP_301"
-    }
-  }
-}
 
 resource "aws_lb_listener" "https" {
   count             = var.certificate_arn != "" ? 1 : 0
@@ -119,11 +84,11 @@ resource "aws_lb_listener" "https" {
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.frontend.arn
+    target_group_arn = aws_lb_target_group.backend.arn
   }
 }
 
-resource "aws_lb_listener" "http_default" {
+resource "aws_lb_listener" "http" {
   count             = var.certificate_arn == "" ? 1 : 0
   load_balancer_arn = aws_lb.this.arn
   port              = 80
@@ -131,30 +96,11 @@ resource "aws_lb_listener" "http_default" {
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.frontend.arn
-  }
-}
-
-# ── Listener Rules (route /api/* to backend) ────────────────
-
-resource "aws_lb_listener_rule" "backend" {
-  listener_arn = var.certificate_arn != "" ? aws_lb_listener.https[0].arn : aws_lb_listener.http_default[0].arn
-  priority     = 100
-
-  action {
-    type             = "forward"
     target_group_arn = aws_lb_target_group.backend.arn
-  }
-
-  condition {
-    path_pattern {
-      values = ["/api/*", "/admin/*"]
-    }
   }
 }
 
 output "dns_name"                { value = aws_lb.this.dns_name }
-output "security_group_id"      { value = aws_security_group.alb.id }
-output "backend_target_group_arn"  { value = aws_lb_target_group.backend.arn }
-output "frontend_target_group_arn" { value = aws_lb_target_group.frontend.arn }
+output "security_group_id"       { value = aws_security_group.alb.id }
+output "backend_target_group_arn" { value = aws_lb_target_group.backend.arn }
 output "alb_arn"                 { value = aws_lb.this.arn }
