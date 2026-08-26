@@ -1,12 +1,13 @@
 from datetime import timedelta
 from pathlib import Path
+from urllib.parse import urlparse
 
 from decouple import config
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = config("SECRET_KEY", default="unsafe-development-key")
-DEBUG = config("DEBUG", default=False, cast=bool)
+DEBUG = config("DJANGO_DEBUG", default=False, cast=bool)
 ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost,127.0.0.1", cast=lambda value: [item.strip() for item in value.split(",")])
 
 INSTALLED_APPS = [
@@ -18,6 +19,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "corsheaders",
     "rest_framework",
+    "drf_yasg",
     "users",
     "tasks",
 ]
@@ -47,12 +49,26 @@ TEMPLATES = [{
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+def database_config():
+    """Use SQLite locally, or a PostgreSQL URL supplied through DATABASE_URL."""
+    database_url = config("DATABASE_URL", default="sqlite")
+    if database_url == "sqlite":
+        return {"ENGINE": "django.db.backends.sqlite3", "NAME": BASE_DIR / "db.sqlite3"}
+
+    parsed = urlparse(database_url)
+    if parsed.scheme not in ("postgres", "postgresql"):
+        raise ValueError("DATABASE_URL must be 'sqlite' or a PostgreSQL URL")
+    return {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": parsed.path.lstrip("/"),
+        "USER": parsed.username or "",
+        "PASSWORD": parsed.password or "",
+        "HOST": parsed.hostname or "",
+        "PORT": parsed.port or "",
     }
-}
+
+
+DATABASES = {"default": database_config()}
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
