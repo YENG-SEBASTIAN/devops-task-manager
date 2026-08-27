@@ -85,9 +85,17 @@ resource "aws_iam_role_policy" "task_permissions" {
   policy = data.aws_iam_policy_document.task_permissions.json
 }
 
-# ── GitHub Actions OIDC Role ────────────────────────────────
+# ── GitHub Actions OIDC Provider ────────────────────────────
 
 data "aws_caller_identity" "current" {}
+
+resource "aws_iam_openid_connect_provider" "github" {
+  url             = "https://token.actions.githubusercontent.com"
+  client_id_list  = ["sts.amazonaws.com"]
+  thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
+
+  tags = { Name = "${var.name}-github-oidc" }
+}
 
 data "aws_iam_policy_document" "github_assume" {
   statement {
@@ -112,6 +120,8 @@ data "aws_iam_policy_document" "github_assume" {
 resource "aws_iam_role" "github_actions" {
   name               = "${var.name}-github-actions"
   assume_role_policy = data.aws_iam_policy_document.github_assume.json
+
+  depends_on = [aws_iam_openid_connect_provider.github]
 }
 
 data "aws_iam_policy_document" "github_permissions" {

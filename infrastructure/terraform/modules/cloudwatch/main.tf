@@ -22,23 +22,6 @@ resource "aws_cloudwatch_metric_alarm" "backend_cpu_high" {
   }
 }
 
-resource "aws_cloudwatch_metric_alarm" "frontend_cpu_high" {
-  alarm_name          = "${var.name}-frontend-cpu-high"
-  comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = 3
-  metric_name         = "CPUUtilization"
-  namespace           = "AWS/ECS"
-  period              = 300
-  statistic           = "Average"
-  threshold           = 80
-  alarm_description   = "Frontend CPU utilization exceeded 80%"
-
-  dimensions = {
-    ClusterName = var.name
-    ServiceName = "${var.name}-frontend"
-  }
-}
-
 resource "aws_cloudwatch_metric_alarm" "backend_memory_high" {
   alarm_name          = "${var.name}-backend-memory-high"
   comparison_operator = "GreaterThanThreshold"
@@ -147,13 +130,13 @@ resource "aws_cloudwatch_dashboard" "this" {
         width  = 8
         height = 6
         properties = {
-          title  = "Frontend CPU Utilization"
+          title  = "ALB Request Count"
           region = var.region
           metrics = [
-            ["AWS/ECS", "CPUUtilization", "ClusterName", var.name, "ServiceName", "${var.name}-frontend"]
+            ["AWS/ApplicationELB", "RequestCount", "LoadBalancer", "${var.name}"]
           ]
           period = 300
-          stat   = "Average"
+          stat   = "Sum"
         }
       },
     ]

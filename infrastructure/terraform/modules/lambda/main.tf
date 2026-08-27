@@ -46,7 +46,7 @@ data "aws_iam_policy_document" "lambda_permissions" {
       "sqs:DeleteMessage",
       "sqs:GetQueueAttributes",
     ]
-    resources = ["*"]
+    resources = [aws_sqs_queue.notifications.arn]
   }
 
   statement {

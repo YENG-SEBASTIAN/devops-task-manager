@@ -31,8 +31,8 @@ resource "aws_ecs_task_definition" "backend" {
     }]
 
     environment = [
-      { name = "DJANGO_DEBUG",         value = "False" },
-      { name = "ALLOWED_HOSTS",        value = "*" },
+      { name = "DJANGO_DEBUG", value = "False" },
+      { name = "ALLOWED_HOSTS", value = "*" },
       { name = "CORS_ALLOWED_ORIGINS", value = "*" },
     ]
 

@@ -57,7 +57,7 @@ resource "aws_amplify_app" "this" {
               - .next/cache/**/*
   EOT
 
-  enable_branch_auto_build   = true
+  enable_branch_auto_build    = true
   enable_branch_auto_deletion = true
 
   custom_rule {
@@ -90,11 +90,11 @@ resource "aws_amplify_branch" "main" {
   tags = { Name = "${var.name}-main" }
 }
 
-# ── Preview Branch ──────────────────────────────────────────
+# ── Staging Branch ──────────────────────────────────────────
 
-resource "aws_amplify_branch" "pr" {
+resource "aws_amplify_branch" "staging" {
   app_id      = aws_amplify_app.this.id
-  branch_name = "*"
+  branch_name = "staging"
 
   enable_auto_build = true
 
@@ -102,7 +102,7 @@ resource "aws_amplify_branch" "pr" {
     NEXT_PUBLIC_API_URL = var.api_url
   }
 
-  tags = { Name = "${var.name}-pr" }
+  tags = { Name = "${var.name}-staging" }
 }
 
 # ── Domain ──────────────────────────────────────────────────
@@ -118,7 +118,7 @@ resource "aws_amplify_domain_association" "this" {
   }
 
   sub_domain {
-    branch_name = "*"
-    prefix      = "pr-"
+    branch_name = "staging"
+    prefix      = "staging"
   }
 }

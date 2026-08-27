@@ -167,18 +167,18 @@ module "iam" {
 module "ecs" {
   source = "./modules/ecs"
 
-  name                = local.name
-  region              = var.aws_region
-  private_subnets     = module.vpc.private_subnets
-  backend_image       = local.backend_image
-  backend_sg_id       = aws_security_group.backend.id
+  name                 = local.name
+  region               = var.aws_region
+  private_subnets      = module.vpc.private_subnets
+  backend_image        = local.backend_image
+  backend_sg_id        = aws_security_group.backend.id
   backend_target_group = module.alb.backend_target_group_arn
-  execution_role_arn  = module.iam.ecs_execution_role_arn
-  task_role_arn       = module.iam.ecs_task_role_arn
-  db_secret_arn       = module.secrets.db_secret_arn
-  django_secret_arn   = module.secrets.django_secret_arn
-  redis_secret_arn    = module.secrets.redis_secret_arn
-  log_group_name      = module.cloudwatch.log_group_name
+  execution_role_arn   = module.iam.ecs_execution_role_arn
+  task_role_arn        = module.iam.ecs_task_role_arn
+  db_secret_arn        = module.secrets.db_secret_arn
+  django_secret_arn    = module.secrets.django_secret_arn
+  redis_secret_arn     = module.secrets.redis_secret_arn
+  log_group_name       = module.cloudwatch.log_group_name
 }
 
 # ── Amplify (frontend) ──────────────────────────────────────
@@ -198,8 +198,8 @@ module "amplify" {
 module "lambda" {
   source = "./modules/lambda"
 
-  name           = local.name
-  region         = var.aws_region
+  name   = local.name
+  region = var.aws_region
   secret_arns = [
     module.secrets.db_secret_arn,
     module.secrets.django_secret_arn,

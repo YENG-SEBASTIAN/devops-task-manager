@@ -51,9 +51,9 @@ output "redis_endpoint" {
 output "secrets_manager_arns" {
   description = "Secrets Manager secret ARNs."
   value = {
-    db_password     = module.secrets.db_secret_arn
-    django_secret   = module.secrets.django_secret_arn
-    redis           = module.secrets.redis_secret_arn
+    db_password   = module.secrets.db_secret_arn
+    django_secret = module.secrets.django_secret_arn
+    redis         = module.secrets.redis_secret_arn
   }
 }
 

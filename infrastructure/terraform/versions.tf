@@ -6,13 +6,17 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    archive = {
+      source  = "hashicorp/archive"
+      version = "~> 2.0"
+    }
   }
 
   backend "s3" {
-    bucket         = "task-manager-terraform-state"
-    key            = "terraform.tfstate"
-    region         = "eu-west-2"
-    dynamodb_table = "task-manager-terraform-locks"
-    encrypt        = true
+    bucket       = "task-manager-terraform-state-766696030279"
+    key          = "terraform.tfstate"
+    region       = "eu-west-2"
+    use_lockfile = true
+    encrypt      = true
   }
 }
