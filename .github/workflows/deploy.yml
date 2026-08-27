@@ -2,45 +2,95 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [master]
+    branches:
+      - master
+
   pull_request:
-    branches: [master]
+    branches:
+      - master
 
 env:
   AWS_REGION: eu-west-2
+
+  # AWS / ECR
   ECR_BACKEND_REPO: task-manager-backend
+
+  # ECS
   ECS_CLUSTER: task-manager-dev
   ECS_BACKEND_SERVICE: task-manager-dev-backend
+
+  # Django
+  DJANGO_SETTINGS_MODULE: config.settings
 
 permissions:
   id-token: write
   contents: read
 
+
+# ============================================================
+# CI
+# ============================================================
+
 jobs:
+
   test:
-    name: Test
+    name: Run Tests
     runs-on: ubuntu-latest
 
     services:
       db:
         image: postgis/postgis:16-3.5
+
         env:
           POSTGRES_DB: task_manager_test
           POSTGRES_USER: task_manager_test
           POSTGRES_PASSWORD: task_manager_test
+
         ports:
           - 5432:5432
+
         options: >-
-          --health-cmd "pg_isready -U task_manager_test"
+          --health-cmd "pg_isready -U task_manager_test -d task_manager_test"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
 
     steps:
-      - name: Checkout
+
+      # ------------------------------------------------------
+      # Checkout
+      # ------------------------------------------------------
+
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── Backend tests ──────────────────────────────────────
+
+      # ------------------------------------------------------
+      # Install GeoDjango system dependencies
+      # ------------------------------------------------------
+
+      - name: Install GDAL and GeoDjango dependencies
+        run: |
+          sudo apt-get update
+
+          sudo apt-get install -y \
+            gdal-bin \
+            libgdal-dev \
+            libgeos-dev \
+            libproj-dev \
+            binutils
+
+          echo "GDAL version:"
+          gdal-config --version
+
+          echo "GDAL location:"
+          which gdal-config
+
+
+      # ------------------------------------------------------
+      # Python
+      # ------------------------------------------------------
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -48,19 +98,64 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.txt
 
-      - name: Install backend dependencies
-        run: pip install -r requirements.txt
-        working-directory: backend
 
-      - name: Run backend tests
+      # ------------------------------------------------------
+      # Install backend dependencies
+      # ------------------------------------------------------
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+
+      # ------------------------------------------------------
+      # Verify Django configuration
+      # ------------------------------------------------------
+
+      - name: Check Django
+        working-directory: backend
         env:
           SECRET_KEY: ci-test-secret-key
           DATABASE_URL: postgresql://task_manager_test:task_manager_test@localhost:5432/task_manager_test
           DJANGO_DEBUG: "True"
-        run: python manage.py test --verbosity=2
-        working-directory: backend
+        run: |
+          python manage.py check
 
-      # ── Frontend lint & typecheck ───────────────────────────
+
+      # ------------------------------------------------------
+      # Run migrations
+      # ------------------------------------------------------
+
+      - name: Run migrations
+        working-directory: backend
+        env:
+          SECRET_KEY: ci-test-secret-key
+          DATABASE_URL: postgresql://task_manager_test:task_manager_test@localhost:5432/task_manager_test
+          DJANGO_DEBUG: "True"
+        run: |
+          python manage.py migrate --noinput
+
+
+      # ------------------------------------------------------
+      # Backend tests
+      # ------------------------------------------------------
+
+      - name: Run backend tests
+        working-directory: backend
+        env:
+          SECRET_KEY: ci-test-secret-key
+          DATABASE_URL: postgresql://task_manager_test:task_manager_test@localhost:5432/task_manager_test
+          DJANGO_DEBUG: "True"
+        run: |
+          python manage.py test --verbosity=2
+
+
+      # ------------------------------------------------------
+      # Node.js
+      # ------------------------------------------------------
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -68,30 +163,69 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
+
+      # ------------------------------------------------------
+      # Frontend dependencies
+      # ------------------------------------------------------
+
       - name: Install frontend dependencies
-        run: npm ci
         working-directory: frontend
+        run: |
+          npm ci
+
+
+      # ------------------------------------------------------
+      # Frontend typecheck
+      # ------------------------------------------------------
 
       - name: Frontend typecheck
-        run: npx tsc --noEmit
         working-directory: frontend
+        run: |
+          npx tsc --noEmit
+
+
+      # ------------------------------------------------------
+      # Frontend lint
+      # ------------------------------------------------------
 
       - name: Frontend lint
-        run: npm run lint
         working-directory: frontend
+        run: |
+          npm run lint
+
+
+  # ==========================================================
+  # BUILD BACKEND
+  # ==========================================================
 
   build-and-push-backend:
     name: Build & Push Backend
     runs-on: ubuntu-latest
-    needs: test
-    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+
+    needs:
+      - test
+
+    # Only deploy from master
+    if: >
+      github.ref == 'refs/heads/master' &&
+      github.event_name == 'push'
 
     outputs:
-      backend_image: ${{ steps.tags.outputs.backend }}
+      image: ${{ steps.image.outputs.image }}
 
     steps:
-      - name: Checkout
+
+      # ------------------------------------------------------
+      # Checkout
+      # ------------------------------------------------------
+
+      - name: Checkout repository
         uses: actions/checkout@v4
+
+
+      # ------------------------------------------------------
+      # AWS authentication
+      # ------------------------------------------------------
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -99,110 +233,224 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
+
+      # ------------------------------------------------------
+      # Login to ECR
+      # ------------------------------------------------------
+
       - name: Login to Amazon ECR
-        id: ecr-login
+        id: ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+
+      # ------------------------------------------------------
+      # Generate Docker image tag
+      # ------------------------------------------------------
+
       - name: Generate image tag
-        id: tags
+        id: image
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
         run: |
-          SHORT_SHA="${GITHUB_SHA::7}"
-          echo "backend=${ECR_BACKEND_REPO}:${SHORT_SHA}" >> "$GITHUB_OUTPUT"
-          echo "backend_latest=${ECR_BACKEND_REPO}:latest" >> "$GITHUB_OUTPUT"
+          IMAGE="${REGISTRY}/${ECR_BACKEND_REPO}:${GITHUB_SHA}"
+
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+
+          echo "Building:"
+          echo "${IMAGE}"
+
+
+      # ------------------------------------------------------
+      # Build & push Docker image
+      # ------------------------------------------------------
 
       - name: Build and push backend image
         uses: docker/build-push-action@v6
         with:
           context: ./backend
           push: true
+
           tags: |
-            ${{ steps.ecr-login.outputs.registry }}/${{ steps.tags.outputs.backend }}
-            ${{ steps.ecr-login.outputs.registry }}/${{ steps.tags.outputs.backend_latest }}
+            ${{ steps.image.outputs.image }}
+            ${{ steps.ecr.outputs.registry }}/${{ env.ECR_BACKEND_REPO }}:latest
+
+
+  # ==========================================================
+  # DEPLOY BACKEND
+  # ==========================================================
 
   deploy-backend:
-    name: Deploy Backend (ECS)
+    name: Deploy Backend to ECS
     runs-on: ubuntu-latest
-    needs: build-and-push-backend
-    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+
+    needs:
+      - build-and-push-backend
+
+    if: >
+      github.ref == 'refs/heads/master' &&
+      github.event_name == 'push'
 
     steps:
+
+      # ------------------------------------------------------
+      # AWS authentication
+      # ------------------------------------------------------
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Deploy backend to ECS
+
+      # ------------------------------------------------------
+      # Deploy
+      # ------------------------------------------------------
+
+      - name: Force ECS deployment
         run: |
           aws ecs update-service \
-            --cluster $ECS_CLUSTER \
-            --service $ECS_BACKEND_SERVICE \
-            --force-new-deployment \
-            --query 'service.{status:status,taskDefinition:taskDefinition}'
+            --cluster "$ECS_CLUSTER" \
+            --service "$ECS_BACKEND_SERVICE" \
+            --force-new-deployment
 
-      - name: Wait for backend deployment
+
+      # ------------------------------------------------------
+      # Wait for ECS
+      # ------------------------------------------------------
+
+      - name: Wait for ECS deployment
         run: |
           aws ecs wait services-stable \
-            --cluster $ECS_CLUSTER \
-            --services $ECS_BACKEND_SERVICE
-          echo "Backend deployment is stable."
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_BACKEND_SERVICE"
 
-      - name: Verify backend deployment
+          echo "Backend deployment completed successfully."
+
+
+      # ------------------------------------------------------
+      # Verify deployment
+      # ------------------------------------------------------
+
+      - name: Verify ECS service
         run: |
           aws ecs describe-services \
-            --cluster $ECS_CLUSTER \
-            --services $ECS_BACKEND_SERVICE \
-            --query 'services[].{name:serviceName,status:status,desired:desiredCount,running:runningCount}'
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_BACKEND_SERVICE" \
+            --query 'services[].{
+              service:serviceName,
+              status:status,
+              desired:desiredCount,
+              running:runningCount,
+              pending:pendingCount,
+              taskDefinition:taskDefinition
+            }' \
+            --output table
+
+
+  # ==========================================================
+  # DEPLOY FRONTEND
+  # ==========================================================
 
   deploy-frontend:
-    name: Deploy Frontend (Amplify)
+    name: Deploy Frontend to Amplify
     runs-on: ubuntu-latest
-    needs: test
-    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+
+    needs:
+      - test
+
+    if: >
+      github.ref == 'refs/heads/master' &&
+      github.event_name == 'push'
 
     steps:
+
+      # ------------------------------------------------------
+      # AWS authentication
+      # ------------------------------------------------------
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Deploy frontend to Amplify
+
+      # ------------------------------------------------------
+      # Start Amplify deployment
+      # ------------------------------------------------------
+
+      - name: Start Amplify deployment
+        id: amplify
         run: |
-          aws amplify start-deployment \
-            --app-id ${{ secrets.AMPLIFY_APP_ID }} \
-            --branch-name master
-          echo "Amplify deployment started."
+          JOB_ID=$(aws amplify start-job \
+            --app-id "${{ secrets.AMPLIFY_APP_ID }}" \
+            --branch-name master \
+            --job-type RELEASE \
+            --query 'jobSummary.jobId' \
+            --output text)
+
+          echo "Amplify Job ID: $JOB_ID"
+
+          echo "job_id=$JOB_ID" >> "$GITHUB_OUTPUT"
+
+
+      # ------------------------------------------------------
+      # Wait for Amplify
+      # ------------------------------------------------------
 
       - name: Wait for Amplify deployment
+        env:
+          JOB_ID: ${{ steps.amplify.outputs.job_id }}
         run: |
+
           while true; do
+
             STATUS=$(aws amplify get-job \
-              --app-id ${{ secrets.AMPLIFY_APP_ID }} \
+              --app-id "${{ secrets.AMPLIFY_APP_ID }}" \
               --branch-name master \
-              --job-id $(aws amplify list-jobs \
-                --app-id ${{ secrets.AMPLIFY_APP_ID }} \
-                --branch-name master \
-                --max-results 1 \
-                --query 'jobSummaries[0].jobId' \
-                --output text) \
+              --job-id "$JOB_ID" \
               --query 'job.summary.status' \
               --output text)
-            echo "Amplify status: $STATUS"
-            if [ "$STATUS" = "SUCCEED" ]; then
-              echo "Frontend deployment succeeded."
-              break
-            elif [ "$STATUS" = "FAILED" ]; then
-              echo "Frontend deployment failed."
-              exit 1
-            fi
-            sleep 30
+
+            echo "Amplify deployment status: $STATUS"
+
+            case "$STATUS" in
+
+              SUCCEED)
+                echo "Frontend deployment succeeded."
+                break
+                ;;
+
+              FAILED|CANCELLING|CANCELLED)
+                echo "Frontend deployment failed."
+                exit 1
+                ;;
+
+              *)
+                echo "Deployment still running..."
+                sleep 20
+                ;;
+
+            esac
+
           done
+
+
+      # ------------------------------------------------------
+      # Get frontend URL
+      # ------------------------------------------------------
 
       - name: Get Amplify URL
         run: |
-          AMPLIFY_URL=$(aws amplify get-app \
-            --app-id ${{ secrets.AMPLIFY_APP_ID }} \
+
+          DOMAIN=$(aws amplify get-app \
+            --app-id "${{ secrets.AMPLIFY_APP_ID }}" \
             --query 'app.defaultDomain' \
             --output text)
-          echo "Frontend URL: https://master.${AMPLIFY_URL}"
+
+          echo ""
+          echo "=========================================="
+          echo "Frontend:"
+          echo "https://master.${DOMAIN}"
+          echo "=========================================="
