@@ -2,33 +2,40 @@ resource "aws_db_subnet_group" "this" {
   name       = "${var.name}-db"
   subnet_ids = var.subnet_ids
 
-  tags = { Name = "${var.name}-db-subnet-group" }
+  tags = {
+    Name = "${var.name}-db-subnet-group"
+  }
 }
 
-resource "aws_rds_cluster" "this" {
-  cluster_identifier     = "${var.name}-db"
-  engine                 = "aurora-postgresql"
-  engine_version         = "16.6"
-  database_name          = var.db_name
-  master_username        = var.db_username
-  master_password        = var.db_password
+resource "aws_db_instance" "this" {
+  identifier = "${var.name}-db"
+
+  engine         = "postgres"
+  engine_version = "16.14"
+
+  instance_class        = var.instance_class
+  allocated_storage     = 20
+  max_allocated_storage = 100
+  storage_type          = "gp3"
+
+  db_name  = var.db_name
+  username = var.db_username
+  password = var.db_password
+
   db_subnet_group_name   = aws_db_subnet_group.this.name
   vpc_security_group_ids = var.security_group_ids
-  storage_encrypted      = true
-  skip_final_snapshot    = true
 
-  tags = { Name = "${var.name}-db-cluster" }
-}
+  publicly_accessible = false
 
-resource "aws_rds_cluster_instance" "this" {
-  count                = 1
-  identifier           = "${var.name}-db-${count.index}"
-  cluster_identifier   = aws_rds_cluster.this.id
-  instance_class       = var.instance_class
-  engine               = aws_rds_cluster.this.engine
-  engine_version       = aws_rds_cluster.this.engine_version
-  publicly_accessible  = false
-  db_subnet_group_name = aws_db_subnet_group.this.name
+  storage_encrypted = true
 
-  tags = { Name = "${var.name}-db-instance" }
+  backup_retention_period = 0
+
+  skip_final_snapshot = true
+
+  deletion_protection = false
+
+  tags = {
+    Name = "${var.name}-db"
+  }
 }

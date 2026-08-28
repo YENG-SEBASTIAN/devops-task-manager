@@ -1,12 +1,12 @@
-# ── Database Secrets ────────────────────────────────────────
-
 resource "aws_secretsmanager_secret" "db_password" {
-  name        = "${var.name}/db-password"
-  description = "PostgreSQL master password"
+  name                    = "${var.name}/db-password"
+  description             = "PostgreSQL master password"
+  recovery_window_in_days = 0
 }
 
 resource "aws_secretsmanager_secret_version" "db_password" {
   secret_id = aws_secretsmanager_secret.db_password.id
+
   secret_string = jsonencode({
     username = var.db_username
     password = var.db_password
@@ -19,8 +19,9 @@ resource "aws_secretsmanager_secret_version" "db_password" {
 # ── Django Secret Key ───────────────────────────────────────
 
 resource "aws_secretsmanager_secret" "django_secret_key" {
-  name        = "${var.name}/django-secret-key"
-  description = "Django SECRET_KEY"
+  name                    = "${var.name}/django-secret-key"
+  description             = "Django SECRET_KEY"
+  recovery_window_in_days = 0
 }
 
 resource "aws_secretsmanager_secret_version" "django_secret_key" {
@@ -31,12 +32,14 @@ resource "aws_secretsmanager_secret_version" "django_secret_key" {
 # ── Redis Connection ────────────────────────────────────────
 
 resource "aws_secretsmanager_secret" "redis" {
-  name        = "${var.name}/redis"
-  description = "Redis connection details"
+  name                    = "${var.name}/redis"
+  description             = "Redis connection details"
+  recovery_window_in_days = 0
 }
 
 resource "aws_secretsmanager_secret_version" "redis" {
   secret_id = aws_secretsmanager_secret.redis.id
+
   secret_string = jsonencode({
     host = var.redis_host
     port = 6379
