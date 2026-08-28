@@ -22,6 +22,7 @@ env:
   # Django
   DJANGO_SETTINGS_MODULE: config.settings
 
+
 permissions:
   id-token: write
   contents: read
