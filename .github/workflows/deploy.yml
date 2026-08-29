@@ -13,7 +13,7 @@ env:
   AWS_REGION: eu-west-2
 
   # AWS / ECR
-  ECR_BACKEND_REPO: task-manager-backend
+  ECR_BACKEND_REPO: task-manager-dev-backend
 
   # ECS
   ECS_CLUSTER: task-manager-dev

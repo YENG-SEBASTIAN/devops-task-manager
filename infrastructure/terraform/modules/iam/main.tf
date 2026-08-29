@@ -179,7 +179,7 @@ data "aws_iam_policy_document" "github_permissions" {
   # Amplify permissions
   statement {
     actions   = ["amplify:*"]
-    resources = [var.amplify_app_arn]
+    resources = [var.amplify_app_arn, "${var.amplify_app_arn}/*"]
   }
 
   # Lambda permissions (for CI/CD updates)
