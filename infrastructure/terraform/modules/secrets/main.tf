@@ -8,11 +8,12 @@ resource "aws_secretsmanager_secret_version" "db_password" {
   secret_id = aws_secretsmanager_secret.db_password.id
 
   secret_string = jsonencode({
-    username = var.db_username
-    password = var.db_password
-    dbname   = var.db_name
-    host     = var.db_host
-    port     = 5432
+    username     = var.db_username
+    password     = var.db_password
+    dbname       = var.db_name
+    host         = var.db_host
+    port         = 5432
+    database_url = "postgresql://${var.db_username}:${urlencode(var.db_password)}@${var.db_host}:5432/${var.db_name}"
   })
 }
 
