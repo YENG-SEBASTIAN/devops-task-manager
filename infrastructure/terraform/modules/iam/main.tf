@@ -154,7 +154,10 @@ data "aws_iam_policy_document" "github_permissions" {
       "ecs:UpdateService",
       "ecs:DescribeServices",
       "ecs:DescribeTaskDefinition",
+      "ecs:DescribeTasks",
       "ecs:RegisterTaskDefinition",
+      "ecs:RunTask",
+      "ecs:StopTask",
     ]
     resources = ["*"]
   }

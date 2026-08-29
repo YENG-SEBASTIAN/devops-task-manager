@@ -304,6 +304,58 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       # ------------------------------------------------------
+      # Run database migrations
+      # ------------------------------------------------------
+
+      - name: Run database migrations
+        run: |
+          TASK_DEF=$(aws ecs describe-services \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_BACKEND_SERVICE" \
+            --query 'services[0].taskDefinition' \
+            --output text)
+
+          NETWORK=$(aws ecs describe-services \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_BACKEND_SERVICE" \
+            --query 'services[0].networkConfiguration.awsvpcConfiguration' \
+            --output json)
+
+          TASK_ARN=$(aws ecs run-task \
+            --cluster "$ECS_CLUSTER" \
+            --task-definition "$TASK_DEF" \
+            --launch-type FARGATE \
+            --network-configuration "{\"awsvpcConfiguration\": ${NETWORK}}" \
+            --overrides '{
+              "containerOverrides": [{
+                "name": "backend",
+                "command": ["python", "manage.py", "migrate", "--noinput"]
+              }]
+            }' \
+            --query 'tasks[0].taskArn' \
+            --output text)
+
+          echo "Migration task: $TASK_ARN"
+
+          aws ecs wait tasks-stopped \
+            --cluster "$ECS_CLUSTER" \
+            --tasks "$TASK_ARN"
+
+          EXIT_CODE=$(aws ecs describe-tasks \
+            --cluster "$ECS_CLUSTER" \
+            --tasks "$TASK_ARN" \
+            --query 'tasks[0].containers[0].exitCode' \
+            --output text)
+
+          if [ "$EXIT_CODE" != "0" ]; then
+            echo "Migrations failed (exit code $EXIT_CODE)"
+            exit 1
+          fi
+
+          echo "Database migrations completed successfully."
+
+
+      # ------------------------------------------------------
       # Deploy
       # ------------------------------------------------------
 
