@@ -438,7 +438,7 @@ jobs:
           JOBS_JSON=$(aws amplify list-jobs \
             --app-id "${{ secrets.AMPLIFY_APP_ID }}" \
             --branch-name master \
-            --query 'jobs' \
+            --query 'jobSummaries' \
             --output json || echo '[]')
 
           JOB_ID=$(JOB_JSON="$JOBS_JSON" python3 - <<'EOF'
