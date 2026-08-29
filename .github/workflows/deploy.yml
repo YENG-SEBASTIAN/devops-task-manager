@@ -435,11 +435,23 @@ jobs:
       - name: Start Amplify deployment
         id: amplify
         run: |
-          JOB_ID=$(aws amplify list-jobs \
+          JOBS_JSON=$(aws amplify list-jobs \
             --app-id "${{ secrets.AMPLIFY_APP_ID }}" \
             --branch-name master \
-            --query "reverse(sort_by(jobs[?(status == 'PENDING' || status == 'RUNNING')], &startTime)) | [0].jobId" \
-            --output text)
+            --query 'jobs' \
+            --output json)
+
+          JOB_ID=$(python3 -c "
+import json, sys
+jobs = json.loads(sys.stdin.read() or '[]')
+if not isinstance(jobs, list):
+    jobs = []
+inflight = [j for j in jobs if j.get('status') in ('PENDING', 'RUNNING')]
+if not inflight:
+    print('')
+else:
+    print(max(inflight, key=lambda j: j.get('startTime', 0))['jobId'])
+" <<< "$JOBS_JSON")
 
           if [ -z "$JOB_ID" ] || [ "$JOB_ID" = "None" ]; then
             JOB_ID=$(aws amplify start-job \
