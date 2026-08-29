@@ -383,14 +383,24 @@ jobs:
       - name: Start Amplify deployment
         id: amplify
         run: |
-          JOB_ID=$(aws amplify start-job \
+          JOB_ID=$(aws amplify list-jobs \
             --app-id "${{ secrets.AMPLIFY_APP_ID }}" \
             --branch-name master \
-            --job-type RELEASE \
-            --query 'jobSummary.jobId' \
+            --query "reverse(sort_by(jobs[?(status == 'PENDING' || status == 'RUNNING')], &startTime)) | [0].jobId" \
             --output text)
 
-          echo "Amplify Job ID: $JOB_ID"
+          if [ -z "$JOB_ID" ] || [ "$JOB_ID" = "None" ]; then
+            JOB_ID=$(aws amplify start-job \
+              --app-id "${{ secrets.AMPLIFY_APP_ID }}" \
+              --branch-name master \
+              --job-type RELEASE \
+              --query 'jobSummary.jobId' \
+              --output text)
+
+            echo "Started new Amplify job: $JOB_ID"
+          else
+            echo "Reusing in-flight Amplify job: $JOB_ID"
+          fi
 
           echo "job_id=$JOB_ID" >> "$GITHUB_OUTPUT"
 

@@ -7,10 +7,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install --no-install-recommends -y binutils gdal-bin libgdal-dev libgeos-c1v5 libproj-dev \
+    && apt-get install --no-install-recommends -y binutils curl gdal-bin libgdal-dev libgeos-c1v5 libproj-dev \
     && rm -rf /var/lib/apt/lists/* \
     && addgroup --system app \
     && adduser --system --ingroup app app
+
+ENV HOME=/app
 
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
