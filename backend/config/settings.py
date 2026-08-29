@@ -92,3 +92,6 @@ SIMPLE_JWT = {
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
 }
 CORS_ALLOWED_ORIGINS = config("CORS_ALLOWED_ORIGINS", default="http://localhost:3000", cast=lambda value: [item.strip() for item in value.split(",")])
+CORS_ALLOW_ALL_ORIGINS = "*" in CORS_ALLOWED_ORIGINS
+if CORS_ALLOW_ALL_ORIGINS:
+    CORS_ALLOWED_ORIGINS = [origin for origin in CORS_ALLOWED_ORIGINS if origin != "*"]
